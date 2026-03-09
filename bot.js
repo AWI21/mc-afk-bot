@@ -4,20 +4,20 @@ const config = require('./config.json');
 
 // --- 1. SERWER HTTP DLA RENDERA (Health Check) ---
 http.createServer((req, res) => {
-    res.write('Bot is Ultra-Humanized and active!');
+    res.write('Bot is Ultra-Humanized and active 24/7!');
     res.end();
 }).listen(process.env.PORT || 8080);
 
 const getRandom = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+let globalBot; // Zmienna do obsługi restartów
+
 // --- 2. PŁYNNE OBRACANIE GŁOWY (Bypass Anty-Cheata) ---
-// Zamiast natychmiastowego obrotu, bot przesuwa wzrok w małych krokach
 async function smoothLook(bot) {
     const targetYaw = (Math.random() * Math.PI * 2);
     const targetPitch = ((Math.random() - 0.5) * Math.PI);
     
-    // Dzielimy obrót na 10 małych ruchów
     for (let i = 0; i < 10; i++) {
         if (!bot.entity) return;
         const currentYaw = bot.entity.yaw;
@@ -26,33 +26,28 @@ async function smoothLook(bot) {
         await bot.look(
             currentYaw + (targetYaw - currentYaw) * 0.1,
             currentPitch + (targetPitch - currentPitch) * 0.1,
-            true // true oznacza pominięcie domyślnej animacji skoku
+            true 
         );
-        await sleep(40); // Czekamy chwilę między krokami
+        await sleep(40); 
     }
 }
 
-// --- 3. LOGIKA RUCHU (Humanized) ---
+// --- 3. LOGIKA RUCHU (Humanized & Persistent) ---
 async function movementCycle(bot) {
     if (!bot || !bot.entity) return;
 
-    const playerCount = Object.keys(bot.players).length;
-    if (playerCount <= 1) {
-        console.log('⚠️ Sam na serwerze - bezpieczne wyjście.');
-        bot.quit();
-        return;
-    }
+    // USUNIĘTO: bot.quit() gdy playerCount <= 1 (Bot zostaje 24/7)
 
     bot.clearControlStates();
     const action = getRandom(0, 6);
 
     switch (action) {
-        case 0: // Idź do przodu przez losowy czas
+        case 0: // Idź do przodu
             bot.setControlState('forward', true);
             await sleep(getRandom(500, 1500));
             bot.setControlState('forward', false);
             break;
-        case 1: // Idź do tyłu przez losowy czas
+        case 1: // Idź do tyłu
             bot.setControlState('back', true);
             await sleep(getRandom(500, 1500));
             bot.setControlState('back', false);
@@ -68,12 +63,12 @@ async function movementCycle(bot) {
         case 4: // Machnięcie ręką
             bot.swingArm('right');
             break;
-        case 5: // Kliknięcie Shiftem (sneak)
+        case 5: // Kliknięcie Shiftem
             bot.setControlState('sneak', true);
             await sleep(getRandom(500, 2000));
             bot.setControlState('sneak', false);
             break;
-        case 6: // Dłuższe stanie w miejscu (symulacja czytania czatu)
+        case 6: // Pauza
             await sleep(getRandom(2000, 5000));
             break;
     }
@@ -84,7 +79,7 @@ async function movementCycle(bot) {
 
 // --- 4. SYSTEM TWORZENIA BOTA ---
 function initBot() {
-    console.log('--- Łączenie w trybie Ultra-Safe ---');
+    console.log('--- Łączenie w trybie Non-Stop Ultra-Safe ---');
     
     const bot = mineflayer.createBot({
         host: config.serverHost,
@@ -95,15 +90,15 @@ function initBot() {
         viewDistance: config.botChunk
     });
 
+    globalBot = bot;
+
     bot.on('spawn', () => {
         setTimeout(() => {
-            console.log(`✅ ${config.botUsername} gotowy. Graczy online: ${Object.keys(bot.players).length}`);
+            console.log(`✅ ${config.botUsername} gotowy. Tryb 24/7 aktywny.`);
             movementCycle(bot);
         }, 5000);
     });
 
-    // LOGOWANIE CZATU DO KONSOLI
-    // Dzięki temu na Renderze zobaczysz, czy admin pisał do bota!
     bot.on('message', (jsonMsg) => {
         const message = jsonMsg.toString();
         if (message.trim().length > 0) {
@@ -114,15 +109,23 @@ function initBot() {
     bot.on('error', (err) => console.error('⚠️ Błąd:', err));
 
     bot.on('end', () => {
-        const playersBeforeEnd = Object.keys(bot.players || {}).length;
-        const waitTime = playersBeforeEnd <= 1 ? 600000 : 45000; // 10 min jeśli sam, 45s jeśli błąd
-        console.log(`⛔ Rozłączono. Następna próba za ${waitTime/1000}s...`);
-        setTimeout(initBot, waitTime);
+        // Skrócono czas oczekiwania do 15 sekund, by bot nie wypadał z limitów czasowych serwera
+        console.log(`⛔ Rozłączono. Natychmiastowy powrót za 15s...`);
+        setTimeout(initBot, 15000);
     });
 
     bot.on('kicked', (reason) => {
         console.log('❌ Zostałeś wyrzucony! Powód:', reason);
     });
 }
+
+// --- 5. AUTOMATYCZNE ODŚWIEŻANIE SESJI (Co 4 godziny) ---
+// Zapobiega banom po 8h na silnikach Bukkit/Spigot
+setInterval(() => {
+    if (globalBot) {
+        console.log('🔄 Autorestart sesji (Szybkie odświeżenie IP/Tokena)...');
+        globalBot.quit();
+    }
+}, 14400000);
 
 initBot();
